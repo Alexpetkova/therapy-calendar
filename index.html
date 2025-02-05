@@ -1,0 +1,420 @@
+﻿<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <title>Календар за терапевтични сесии</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FullCalendar CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+    <!-- Font Awesome за иконки -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            padding: 20px;
+        }
+
+        #calendar {
+            max-width: 900px;
+            margin: 40px auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">Система за резервации на терапевтични сесии</h1>
+
+        <!-- Навигационни табове -->
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <!-- Таб "Въвеждане" -->
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="input-tab" data-bs-toggle="tab" data-bs-target="#input" type="button" role="tab" aria-controls="input" aria-selected="true">
+                    Въвеждане
+                </button>
+            </li>
+            <!-- Таб "Календар" -->
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="calendar-tab" data-bs-toggle="tab" data-bs-target="#calendarTab" type="button" role="tab" aria-controls="calendarTab" aria-selected="false">
+                    Календар
+                </button>
+            </li>
+            <!-- Таб "Промяна" -->
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="modify-tab" data-bs-toggle="tab" data-bs-target="#modifyTab" type="button" role="tab" aria-controls="modifyTab" aria-selected="false">
+                    Промяна
+                </button>
+            </li>
+        </ul>
+
+        <!-- Съдържание на табовете -->
+        <div class="tab-content" id="myTabContent">
+            <!-- Таб "Въвеждане" -->
+            <div class="tab-pane fade show active p-4" id="input" role="tabpanel" aria-labelledby="input-tab">
+                <form id="reservationForm">
+                    <div class="mb-3">
+                        <label for="psychologist" class="form-label">Психолог</label>
+                        <select class="form-select" id="psychologist" required>
+                            <option value="">Избери психолог</option>
+                            <option value="Корнелия">Корнелия</option>
+                            <option value="Виолета">Виолета</option>
+                            <option value="Маруся">Маруся</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="client" class="form-label">Клиент</label>
+                        <input type="text" class="form-control" id="client" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="therapyDate" class="form-label">Дата на терапията</label>
+                        <!-- Използва се input type="date" – в съвременните браузъри излиза календар -->
+                        <input type="date" class="form-control" id="therapyDate" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="startTime" class="form-label">Начален час</label>
+                        <input type="time" class="form-control" id="startTime" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="duration" class="form-label">Продължителност (в минути)</label>
+                        <input type="number" class="form-control" id="duration" min="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="location" class="form-label">Място на терапията</label>
+                        <!-- Падащо меню с двете опции -->
+                        <select class="form-select" id="location" required>
+                            <option value="">Избери място</option>
+                            <option value="В кабинет">В кабинет</option>
+                            <option value="Онлайн">Онлайн</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Добави резервация</button>
+                </form>
+            </div>
+
+            <!-- Таб "Календар" -->
+            <div class="tab-pane fade p-4" id="calendarTab" role="tabpanel" aria-labelledby="calendar-tab">
+                <div id="calendar"></div>
+            </div>
+
+            <!-- Таб "Промяна" -->
+            <div class="tab-pane fade p-4" id="modifyTab" role="tabpanel" aria-labelledby="modify-tab">
+                <div class="mb-3">
+                    <label for="modifyPsychologist" class="form-label">Избери психолог</label>
+                    <select class="form-select" id="modifyPsychologist">
+                        <option value="">Избери</option>
+                        <option value="Корнелия">Корнелия</option>
+                        <option value="Виолета">Виолета</option>
+                        <option value="Маруся">Маруся</option>
+                    </select>
+                </div>
+                <!-- Тук ще се показват резервациите за избрания терапевт -->
+                <div id="eventsList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модален прозорец за преглед/редакция на резервация -->
+    <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editModalLabel">Детайли на резервацията</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Затвори"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editReservationForm">
+                        <input type="hidden" id="editEventId">
+                        <div class="mb-3">
+                            <label for="editPsychologist" class="form-label">Психолог</label>
+                            <select class="form-select" id="editPsychologist" required>
+                                <option value="">Избери психолог</option>
+                                <option value="Корнелия">Корнелия</option>
+                                <option value="Виолета">Виолета</option>
+                                <option value="Маруся">Маруся</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editClient" class="form-label">Клиент</label>
+                            <input type="text" class="form-control" id="editClient" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editTherapyDate" class="form-label">Дата на терапията</label>
+                            <input type="date" class="form-control" id="editTherapyDate" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editStartTime" class="form-label">Начален час</label>
+                            <input type="time" class="form-control" id="editStartTime" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editDuration" class="form-label">Продължителност (в минути)</label>
+                            <input type="number" class="form-control" id="editDuration" min="1" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editLocation" class="form-label">Място на терапията</label>
+                            <select class="form-select" id="editLocation" required>
+                                <option value="">Избери място</option>
+                                <option value="В кабинет">В кабинет</option>
+                                <option value="Онлайн">Онлайн</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Затвори</button>
+                    <button type="button" class="btn btn-primary" id="saveEditBtn">Запази промените</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Скриптове -->
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- FullCalendar JS -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Функция за избор на цвят според психолога
+            function getColor(psychologist) {
+                if (psychologist === "Виолета") return "red";
+                if (psychologist === "Маруся") return "blue";
+                if (psychologist === "Корнелия") return "purple";
+                return "gray";
+            }
+
+            // Инициализация на FullCalendar
+            var calendarEl = document.getElementById('calendar');
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                selectable: true,
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+                // При клик върху събитие отваряме модалния прозорец за редакция/преглед
+                eventClick: function (info) {
+                    openEditModal(info.event);
+                }
+            });
+
+            // Рендиране на календара, когато табът "Календар" стане активен
+            var calendarTabEl = document.getElementById('calendar-tab');
+            calendarTabEl.addEventListener('shown.bs.tab', function () {
+                calendar.render();
+            });
+
+            // Зареждане на резервациите от localStorage
+            function loadEvents() {
+                var stored = localStorage.getItem("events");
+                if (stored) {
+                    var events = JSON.parse(stored);
+                    events.forEach(function (ev) {
+                        // Ако вече не е добавен (за да не се дублират)
+                        if (!calendar.getEventById(ev.id)) {
+                            calendar.addEvent({
+                                id: ev.id,
+                                title: ev.psychologist + " - " + ev.client,
+                                start: ev.start,
+                                end: ev.end,
+                                extendedProps: {
+                                    psychologist: ev.psychologist,
+                                    client: ev.client,
+                                    duration: ev.duration,
+                                    location: ev.location
+                                },
+                                backgroundColor: getColor(ev.psychologist)
+                            });
+                        }
+                    });
+                }
+            }
+
+            // Записване на резервациите в localStorage
+            function saveEvents() {
+                var events = calendar.getEvents().map(function (ev) {
+                    return {
+                        id: ev.id,
+                        psychologist: ev.extendedProps.psychologist,
+                        client: ev.extendedProps.client,
+                        start: ev.start.toISOString(),
+                        end: ev.end.toISOString(),
+                        duration: ev.extendedProps.duration,
+                        location: ev.extendedProps.location
+                    };
+                });
+                localStorage.setItem("events", JSON.stringify(events));
+            }
+
+            // Функция за проверка на припокриване на часове
+            // Ако се редактира, се предава id на текущото събитие, за да не се сравнява с него
+            function isTimeConflict(newStart, newEnd, excludeId) {
+                var events = calendar.getEvents();
+                for (var i = 0; i < events.length; i++) {
+                    var ev = events[i];
+                    if (excludeId && ev.id === excludeId) continue;
+                    var existingStart = ev.start;
+                    var existingEnd = ev.end;
+                    // Ако интервалите се припокриват
+                    if (newStart < existingEnd && newEnd > existingStart) {
+                        return ev;
+                    }
+                }
+                return null;
+            }
+
+            // Обработка на формата за нова резервация
+            document.getElementById('reservationForm').addEventListener('submit', function (e) {
+                e.preventDefault();
+
+                var psychologist = document.getElementById('psychologist').value;
+                var client = document.getElementById('client').value;
+                var therapyDate = document.getElementById('therapyDate').value;
+                var startTime = document.getElementById('startTime').value;
+                var duration = parseInt(document.getElementById('duration').value);
+                var locationVal = document.getElementById('location').value;
+
+                var startDateTime = new Date(therapyDate + 'T' + startTime);
+                var endDateTime = new Date(startDateTime.getTime() + duration * 60000);
+
+                // Проверка за припокриване
+                var conflict = isTimeConflict(startDateTime, endDateTime);
+                if (conflict) {
+                    alert("Часът е вече зает от " + conflict.extendedProps.psychologist);
+                    return;
+                }
+
+                var eventId = Date.now().toString(); // уникално id
+
+                calendar.addEvent({
+                    id: eventId,
+                    title: psychologist + " - " + client,
+                    start: startDateTime,
+                    end: endDateTime,
+                    extendedProps: {
+                        psychologist: psychologist,
+                        client: client,
+                        duration: duration,
+                        location: locationVal
+                    },
+                    backgroundColor: getColor(psychologist)
+                });
+
+                saveEvents();
+
+                // Изчистване на формата и превключване към таба "Календар"
+                document.getElementById('reservationForm').reset();
+                var tabTrigger = new bootstrap.Tab(document.querySelector('#calendar-tab'));
+                tabTrigger.show();
+            });
+
+            // Работа с модалния прозорец за преглед/редакция
+            var editModal = new bootstrap.Modal(document.getElementById('editModal'));
+
+            function openEditModal(event) {
+                // Попълване на данните в модала
+                document.getElementById('editEventId').value = event.id;
+                document.getElementById('editPsychologist').value = event.extendedProps.psychologist;
+                document.getElementById('editClient').value = event.extendedProps.client;
+                var start = new Date(event.start);
+                document.getElementById('editTherapyDate').value = start.toISOString().split("T")[0];
+                document.getElementById('editStartTime').value = start.toTimeString().substring(0, 5);
+                document.getElementById('editDuration').value = event.extendedProps.duration;
+                document.getElementById('editLocation').value = event.extendedProps.location;
+                editModal.show();
+            }
+
+            // Записване на промените от модала
+            document.getElementById('saveEditBtn').addEventListener('click', function () {
+                var id = document.getElementById('editEventId').value;
+                var psychologist = document.getElementById('editPsychologist').value;
+                var client = document.getElementById('editClient').value;
+                var therapyDate = document.getElementById('editTherapyDate').value;
+                var startTime = document.getElementById('editStartTime').value;
+                var duration = parseInt(document.getElementById('editDuration').value);
+                var locationVal = document.getElementById('editLocation').value;
+
+                var startDateTime = new Date(therapyDate + 'T' + startTime);
+                var endDateTime = new Date(startDateTime.getTime() + duration * 60000);
+
+                // Проверка за припокриване (изключвайки текущото събитие)
+                var conflict = isTimeConflict(startDateTime, endDateTime, id);
+                if (conflict) {
+                    alert("Часът е вече зает от " + conflict.extendedProps.psychologist);
+                    return;
+                }
+
+                var event = calendar.getEventById(id);
+                if (event) {
+                    event.setProp('title', psychologist + " - " + client);
+                    event.setStart(startDateTime);
+                    event.setEnd(endDateTime);
+                    event.setExtendedProp('psychologist', psychologist);
+                    event.setExtendedProp('client', client);
+                    event.setExtendedProp('duration', duration);
+                    event.setExtendedProp('location', locationVal);
+                    event.setProp('backgroundColor', getColor(psychologist));
+
+                    saveEvents();
+                    updateModifyList();
+                    editModal.hide();
+                }
+            });
+
+            // Обработка на таба "Промяна"
+            document.getElementById('modifyPsychologist').addEventListener('change', updateModifyList);
+
+            // Функция за обновяване на списъка с резервации за избрания терапевт
+            function updateModifyList() {
+                var selected = document.getElementById('modifyPsychologist').value;
+                var listContainer = document.getElementById('eventsList');
+                listContainer.innerHTML = "";
+                if (!selected) return;
+                var events = calendar.getEvents().filter(function (ev) {
+                    return ev.extendedProps.psychologist === selected;
+                });
+                if (events.length === 0) {
+                    listContainer.innerHTML = "<p>Няма резервации за " + selected + ".</p>";
+                    return;
+                }
+                var listGroup = document.createElement("div");
+                listGroup.className = "list-group";
+                events.forEach(function (ev) {
+                    var item = document.createElement("div");
+                    item.className = "list-group-item d-flex justify-content-between align-items-center";
+                    var start = new Date(ev.start);
+                    var timeStr = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    item.innerHTML = "<div>" + ev.title + " (" + timeStr + ")</div>";
+
+                    var iconsDiv = document.createElement("div");
+                    // Иконка за редакция (молив)
+                    var editIcon = document.createElement("i");
+                    editIcon.className = "fa fa-pencil me-2 text-primary";
+                    editIcon.style.cursor = "pointer";
+                    editIcon.addEventListener('click', function () {
+                        openEditModal(ev);
+                    });
+                    // Иконка за изтриване (кошче)
+                    var deleteIcon = document.createElement("i");
+                    deleteIcon.className = "fa fa-trash text-danger";
+                    deleteIcon.style.cursor = "pointer";
+                    deleteIcon.addEventListener('click', function () {
+                        if (confirm("Сигурни ли сте, че искате да изтриете резервацията?")) {
+                            ev.remove();
+                            saveEvents();
+                            updateModifyList();
+                        }
+                    });
+                    iconsDiv.appendChild(editIcon);
+                    iconsDiv.appendChild(deleteIcon);
+                    item.appendChild(iconsDiv);
+                    listGroup.appendChild(item);
+                });
+                listContainer.appendChild(listGroup);
+            }
+
+            // Първоначално зареждане на резервациите от localStorage
+            loadEvents();
+        });
+    </script>
+</body>
+</html>
